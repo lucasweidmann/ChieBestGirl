@@ -1,9 +1,10 @@
-import kalista from "./kalista.jpg";
+import { useEffect, useState } from "react";
+import kalistaImg from "./kalista.jpg";
 
 const PROFILE = {
   name: "clark",
   handle: "@clark_jkkj",
-  avatar: kalista,
+  avatar: kalistaImg,
 };
 
 const ALL_LINKS = [
@@ -27,10 +28,61 @@ const ALL_LINKS = [
     url: "https://www.speedrun.com/users/clark_jkkj",
     icon: "/icons/kali4.png",
   },
+  { title: "Twitter", url: "https://x.com/clark_jkkj", icon: "/icons/kali5.png" },
 ];
 
+const BACKEND = "http://localhost:5175";
+
 export default function App() {
-  const links = ALL_LINKS;
+  const [meta, setMeta] = useState(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    const ctrl = new AbortController();
+
+    setErr("");
+    setMeta(null);
+
+    const t = setTimeout(() => ctrl.abort(), 8000);
+
+    fetch(
+      BACKEND + "/api/meta/kalista?region=br&position=adc&game_mode=ranked&tier=emerald_plus",
+      { signal: ctrl.signal }
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        if (!alive) return;
+        if (data && data.error) throw new Error(data.error);
+        setMeta(data);
+        setErr("");
+      })
+      .catch((e) => {
+        if (!alive) return;
+        setErr(
+          e && e.name === "AbortError"
+            ? "timeout no backend"
+            : String((e && e.message) || e)
+        );
+      })
+      .finally(() => clearTimeout(t));
+
+    return () => {
+      alive = false;
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, []);
+
+  function toPercent(x) {
+    if (x == null) return null;
+    var n = Number(x);
+    if (!isFinite(n)) return null;
+    if (n <= 1) n = n * 100;
+    return n.toFixed(2);
+  }
+
+  var wr = meta ? toPercent(meta.winRate) : null;
 
   return (
     <div style={styles.page}>
@@ -39,16 +91,23 @@ export default function App() {
       <main style={styles.card}>
         <header style={styles.header}>
           <div style={styles.avatarWrap}>
-            <img src={PROFILE.avatar} style={styles.avatar} />
+            <img src={PROFILE.avatar} style={styles.avatar} alt="avatar" />
           </div>
 
           <h1 style={styles.name}>{PROFILE.name}</h1>
           <div style={styles.handle}>{PROFILE.handle}</div>
-          <p style={styles.bio}>{PROFILE.bio}</p>
+
+          <p style={styles.bio}>
+            {err
+              ? "Error Fetching Data.."
+              : wr
+              ? "Kalista Global Winrate — " + wr + "%"
+              : "Fetching Data.."}
+          </p>
         </header>
 
         <section style={styles.links}>
-          {links.map((item) => (
+          {ALL_LINKS.map((item) => (
             <a
               key={item.url}
               href={item.url}
@@ -61,7 +120,7 @@ export default function App() {
                 <div style={styles.linkUrl}>{item.url}</div>
               </div>
 
-              <img src={item.icon} style={styles.icon} />
+              <img src={item.icon} style={styles.icon} alt="" />
             </a>
           ))}
         </section>
